@@ -1,0 +1,1 @@
+#Lógica matemática e busca de caminhos (fluxo/cooperative A*)
