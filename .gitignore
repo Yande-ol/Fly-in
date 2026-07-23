@@ -1,0 +1,16 @@
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Ambientes virtuais
+venv/
+env/
+.env
+
+# Sistema Operacional (Mac & Linux)
+.DS_Store
+.directory
