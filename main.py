@@ -1,10 +1,9 @@
 import sys
 from pathlib import Path
+from src.parser import MapParseError, Parser
 
 src_path = Path(__file__).parent / "src"
 sys.path.append(str(src_path))
-
-from parser import MapParseError, Parser  # Sem o '.py'
 
 
 def main() -> None:

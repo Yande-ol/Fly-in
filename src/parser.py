@@ -1,7 +1,7 @@
 # Leitor e validador do arquivo de mapa
 import re
 from typing import Dict, Optional, Tuple
-from models import Connection, Graph, Zone, ZoneType
+from src.models import Connection, Graph, Zone, ZoneType
 
 
 class MapParseError(Exception):
