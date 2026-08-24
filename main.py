@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 from src.parser import MapParseError, Parser
 from src.pathfinder import Pathfinder
+from src.simulator import Simulator
 
 src_path = Path(__file__).parent / "src"
 sys.path.append(str(src_path))
@@ -43,6 +44,17 @@ def main() -> None:
             print(f"Total de rotas disjuntas encontradas: {len(paths)}")
             for idx, p in enumerate(paths, start=1):
                 print(f"  • Rota {idx}: {p}")
+
+        # teste da execucao do simulator
+        print("=== Simulacao Turno a Turno ===")
+        simulator = Simulator(graph, nb_drones)
+        output_lines = simulator.run()
+
+        if not output_lines:
+            print("Nenhum movimento foi realizado.")
+        else:
+            for idx, line in enumerate(output_lines, start=1):
+                print(f"Turno {idx:02d}: {line}")
 
     except MapParseError as err:
         print(f"\033[91m[Erro de Parsing]\033[0m {err}")
