@@ -1,66 +1,69 @@
+import argparse
 import sys
-from pathlib import Path
 from src.parser import MapParseError, Parser
 from src.pathfinder import Pathfinder
 from src.simulator import Simulator
 
-src_path = Path(__file__).parent / "src"
-sys.path.append(str(src_path))
+
+def show_debug_info(graph, nb_drones) -> None:
+    """Exibe informações detalhadas de diagnóstico (apenas com flag --debug)."""
+    print("=== Mapa Carregado com Sucesso ===")
+    print(f"Número de drones: {nb_drones}")
+    print(f"Start Hub: {graph.start_hub}")
+    print(f"End Hub: {graph.end_hub}")
+    print(f"Total de zonas: {len(graph.zones)}")
+    print(f"Total de conexões: {len(graph.connections)}\n")
+
+    print("=== Teste do Pathfinder ===")
+    pathfinder = Pathfinder(graph)
+    shortest = pathfinder.find_shortest_path()
+    print(f"Caminho mais curto absoluto: {shortest}")
+
+    paths = pathfinder.find_multiple_paths()
+    if not paths:
+        print("\033[93m[Aviso]\033[0m Nenhum caminho válido encontrado!")
+    else:
+        print(f"Total de rotas disjuntas encontradas: {len(paths)}")
+        for idx, p in enumerate(paths, start=1):
+            print(f"  • Rota {idx}: {p}")
+    print("\n=== Simulação Turno a Turno ===")
 
 
 def main() -> None:
-    args: list[str] = sys.argv[1:]
+    cli_parser = argparse.ArgumentParser(
+        description="Fly-in: Roteador e simulador de tráfego de drones."
+    )
+    cli_parser.add_argument(
+        "map_file", help="Caminho para o arquivo de mapa (.map)"
+    )
+    cli_parser.add_argument(
+        "-d",
+        "--debug",
+        action="store_true",
+        help="Exibe logs detalhados do parser e pathfinder",
+    )
 
-    if not args:
-        print("Uso: python3 main.py <caminho_do_mapa>")
-        sys.exit(1)
-
-    map_path: str = args[0]
+    args = cli_parser.parse_args()
     parser = Parser()
 
     try:
-        # teste do nosso parser
-        graph, nb_drones = parser.parse_file(map_path)
-        print("=== Mapa Carregado com Sucesso ===")
-        print(f"Número de drones: {nb_drones}")
-        print(f"Start Hub: {graph.start_hub}")
-        print(f"End Hub: {graph.end_hub}")
-        print(f"Total de zonas: {len(graph.zones)}")
-        print(f"Total de conexões: {len(graph.connections)}")
+        graph, nb_drones = parser.parse_file(args.map_file)
 
-        # teste do nosso pathfinderr
-        print("=== Tete do nosso pathfinder ===")
-        pathfinder = Pathfinder(graph)
+        if args.debug:
+            show_debug_info(graph, nb_drones)
 
-        # teste dos cominhos mais curtos(dijkstra purin)
-        shortest = pathfinder.find_shortest_path()
-        print(f"Caminho mais curto obsoluto: {shortest}")
-
-        # teste dos multiplos caminhos (rotas paralelas disjuntas)
-        paths = pathfinder.find_multiple_paths()
-        if not paths:
-            print("\033[93m[Aviso]\033[0m Nenhum caminho válido até o destino!")
-        else:
-            print(f"Total de rotas disjuntas encontradas: {len(paths)}")
-            for idx, p in enumerate(paths, start=1):
-                print(f"  • Rota {idx}: {p}")
-
-        # teste da execucao do simulator
-        print("=== Simulacao Turno a Turno ===")
         simulator = Simulator(graph, nb_drones)
         output_lines = simulator.run()
 
-        if not output_lines:
-            print("Nenhum movimento foi realizado.")
-        else:
-            for idx, line in enumerate(output_lines, start=1):
-                print(f"Turno {idx:02d}: {line}")
+        # Saída oficial exigida pelo subject (VII.5)
+        for line in output_lines:
+            print(line)
 
     except MapParseError as err:
-        print(f"\033[91m[Erro de Parsing]\033[0m {err}")
+        sys.stderr.write(f"Erro no mapa: {err}\n")
         sys.exit(1)
     except FileNotFoundError:
-        print(f"\033[91m[Erro]\033[0m Arquivo não encontrado: {map_path}")
+        sys.stderr.write(f"Arquivo não encontrado: {args.map_file}\n")
         sys.exit(1)
 
 
