@@ -1,4 +1,5 @@
-# Motor de simulação por turnos e histórico
+"""Motor de simulação por turnos e histórico."""
+
 from typing import Dict, List
 from src.models import Drone, Graph, ZoneType
 from src.pathfinder import Pathfinder
@@ -25,34 +26,18 @@ class Simulator:
             self.drones.append(Drone(i, self.graph.start_hub))
 
     def _get_connection_name(self, zone_a: str, zone_b: str) -> str:
-        """Retorna o identificador de conexão correspondente no grafo."""
-        for conn in self.graph.connections:
-            if hasattr(conn, "name"):
-                if conn.name in (f"{zone_a}-{zone_b}", f"{zone_b}-{zone_a}"):
-                    return conn.name
-
-            if hasattr(conn, "zone_a") and hasattr(conn, "zone_b"):
-                if (
-                    conn.zone_a.name == zone_a and conn.zone_b.name == zone_b
-                ) or (
-                    conn.zone_a.name == zone_b and conn.zone_b.name == zone_a
-                ):
-                    return getattr(conn, "name", f"{zone_a}-{zone_b}")
-
+        """Retorna o identificador formatado do link entre duas zonas."""
         return f"{zone_a}-{zone_b}"
 
     def _plan_drone_routes(self) -> None:
-        """Distribui os drones pelos caminhos para
-        minimizar os turnos totais."""
-        """Esse funcao resolve o problema de escalonamento temporal"""
+        """Distribui os drones pelos caminhos para minimizar turnos totais."""
         pathfinder = Pathfinder(self.graph)
         paths = pathfinder.find_multiple_paths()
 
         if not paths or self.graph.start_hub is None:
             return
 
-        # Rastreia o próximo turno em que cada
-        # caminho estará livre para partida
+        # Rastreia o próximo turno em que cada rota estará livre para partida
         path_next_available_turn: Dict[int, int] = {
             i: 0 for i in range(len(paths))
         }
@@ -86,7 +71,6 @@ class Simulator:
                 to_zone = chosen_path.zones[i + 1]
 
                 if to_zone.zone_type == ZoneType.RESTRICTED:
-                    # Usa o nome oficial registrado da conexão no grafo
                     conn_name = self._get_connection_name(
                         from_zone.name, to_zone.name
                     )
