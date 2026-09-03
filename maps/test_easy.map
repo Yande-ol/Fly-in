@@ -1,9 +1,0 @@
-nb_drones: 3
-start_hub: start 0 0 [color=green]
-end_hub: end 10 0 [color=yellow]
-hub: roof 5 5 [zone=normal color=blue max_drones=1]
-hub: tunnel 5 -5 [zone=restricted color=red max_drones=1]
-connection: start-roof
-connection: start-tunnel
-connection: roof-end
-connection: tunnel-end
