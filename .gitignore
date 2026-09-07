@@ -7,6 +7,7 @@ __pycache__/
 .mypy_cache/
 test_all.py
 code_avl.txt
+avl.md
 
 # Ambientes virtuais
 venv/
