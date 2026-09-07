@@ -24,7 +24,9 @@ clean:
 # Verificação obrigatória de qualidade de código (Capítulo III.2)
 lint:
 	flake8 .
-	mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
+	mypy . --warn-return-any --warn-unused-ignores \
+        --ignore-missing-imports --disallow-untyped-defs \
+        --check-untyped-defs
 
 # Verificação estrita opcional
 lint-strict:

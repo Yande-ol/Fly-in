@@ -1,4 +1,4 @@
-# Classes de dados: Zone, Connection, Drone, Graph
+"""Classes de dados: Zone, Connection, Drone, Graph."""
 
 from enum import Enum
 from typing import Dict, List, Optional
@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 
 class ZoneType(Enum):
     """Tipos de zonas permitidos no mapa."""
+
     NORMAL = "normal"
     BLOCKED = "blocked"
     RESTRICTED = "restricted"
@@ -45,9 +46,9 @@ class Zone:
 
     def __repr__(self) -> str:
         return (
-            f"Zone({self.name},type={self.zone_type.value}, "
+            f"Zone({self.name}, type={self.zone_type.value}, "
             f"max_drones={self.max_drones})"
-            )
+        )
 
 
 class Connection:
@@ -104,8 +105,9 @@ class Graph:
         self.connections.append(connection)
 
     def get_neighbors(self, zone: Zone) -> List[Zone]:
-        """Retorna todas as zonas adjacentes"""
-        """acessíveis a partir de uma zona."""
+        """Retorna todas as zonas adjacentes acessíveis
+        a partir de uma zona.
+        """
         neighbors: List[Zone] = []
         for conn in self.connections:
             if conn.source.name == zone.name:

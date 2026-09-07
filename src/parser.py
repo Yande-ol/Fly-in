@@ -1,6 +1,7 @@
-# Leitor e validador do arquivo de mapa
+"""Leitor e validador do arquivo de mapa."""
+
 import re
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Set, Tuple
 from src.models import Connection, Graph, Zone, ZoneType
 
 
@@ -21,10 +22,10 @@ class Parser:
         self.nb_drones: int = 0
         self.start_found: bool = False
         self.end_found: bool = False
-        self.connection_set: set[Tuple[str, str]] = set()
+        self.connection_set: Set[Tuple[str, str]] = set()
 
     def parse_file(self, file_path: str) -> Tuple[Graph, int]:
-        """Lê o arquivo de mapa e retorna o Grafo e a quantidade de drones."""
+        """Lê o arquivo de mapa e retorna o Grafo e os drones."""
         with open(file_path, "r", encoding="utf-8") as file:
             lines = file.readlines()
 
@@ -36,89 +37,115 @@ class Parser:
             if not line:
                 continue
 
-            if self.nb_drones == 0 and idx == 1:
+            if self.nb_drones == 0:
                 self._parse_nb_drones(line, idx)
                 continue
 
-            if line.startswith("start_hub:") or line.startswith("end_hub:"):
+            if line.startswith("start_hub:") or line.startswith(
+                "end_hub:"
+            ):
                 self._parse_special_hub(line, idx)
             elif line.startswith("hub:"):
                 self._parse_regular_hub(line, idx)
             elif line.startswith("connection:"):
                 self._parse_connection(line, idx)
             else:
-                raise MapParseError(idx, f"Instrução desconhecida: '{line}'")
+                err_msg = f"Instrução desconhecida: '{line}'"
+                raise MapParseError(idx, err_msg)
 
         self._validate_final_graph()
         return self.graph, self.nb_drones
 
     def _parse_nb_drones(self, line: str, line_num: int) -> None:
         if not line.startswith("nb_drones:"):
-            raise MapParseError(
-                line_num, "A primeira linha deve definir 'nb_drones: <num>'"
+            msg_first = (
+                "A primeira instrução deve definir 'nb_drones: <num>'"
             )
+            raise MapParseError(line_num, msg_first)
         try:
             val = int(line.split(":")[1].strip())
             if val <= 0:
                 raise ValueError()
             self.nb_drones = val
         except ValueError:
-            raise MapParseError(
-                line_num, "nb_drones deve ser um inteiro positivo maior que 0"
+            msg_val = (
+                "nb_drones deve ser um inteiro positivo maior que 0"
             )
+            raise MapParseError(line_num, msg_val)
 
-    def _extract_metadata(self, text: str) -> Tuple[str, Dict[str, str]]:
-        """Extrai o texto base e o dicionário de metadados entre [...]"""
+    def _extract_metadata(
+        self, text: str, line_num: int, allowed_keys: Set[str]
+    ) -> Tuple[str, Dict[str, str]]:
+        """Extrai texto base e metadados entre colchetes."""
+        if text.count("[") != text.count("]") or text.count("[") > 1:
+            raise MapParseError(line_num, "Bloco de metadata inválido")
+
         match = re.search(r"\[(.*?)\]", text)
         metadata: Dict[str, str] = {}
         if match:
+            if match.end() != len(text.strip()):
+                raise MapParseError(
+                    line_num, "Metadata deve aparecer no final da instrução"
+                )
             meta_str = match.group(1)
             text_without_meta = text[: match.start()].strip()
             for pair in meta_str.split():
-                if "=" in pair:
-                    k, v = pair.split("=", 1)
-                    metadata[k.lower()] = v.lower()
+                if "=" not in pair:
+                    raise MapParseError(
+                        line_num, f"Metadata inválida: '{pair}'"
+                    )
+                k, v = pair.split("=", 1)
+                key = k.lower()
+                if key not in allowed_keys or not v:
+                    raise MapParseError(
+                        line_num, f"Metadata inválida: '{key}'"
+                    )
+                metadata[key] = v.lower()
             return text_without_meta, metadata
         return text.strip(), metadata
 
     def _parse_zone_data(
         self, line: str, line_num: int
     ) -> Tuple[str, int, int, ZoneType, Optional[str], int]:
-        clean_line, meta = self._extract_metadata(line)
+        clean_line, meta = self._extract_metadata(
+            line, line_num, {"zone", "color", "max_drones"}
+        )
         parts = clean_line.split(":")[1].strip().split()
 
-        if len(parts) < 3:
-            raise MapParseError(
-                line_num, "Sintaxe inválida para zona."
-                "Esperado: <nome> <x> <y>"
+        if len(parts) != 3:
+            msg_syntax = (
+                "Sintaxe inválida para zona. Esperado: <nome> <x> <y>"
             )
+            raise MapParseError(line_num, msg_syntax)
 
         name, x_str, y_str = parts[0], parts[1], parts[2]
 
         if "-" in name or " " in name:
-            raise MapParseError(
-                line_num,
-                f"Nome da zona não pode conter hífens ou espaços: '{name}'"
+            msg_name = (
+                "Nome da zona não pode conter hífens ou espaços: "
+                f"'{name}'"
             )
+            raise MapParseError(line_num, msg_name)
 
         if name in self.graph.zones:
-            raise MapParseError(line_num, f"Zona duplicada: '{name}'")
+            raise MapParseError(
+                line_num, f"Zona duplicada: '{name}'"
+            )
 
         try:
             x, y = int(x_str), int(y_str)
         except ValueError:
-            raise MapParseError(
-                line_num,
+            msg_coords = (
                 f"Coordenadas devem ser inteiros: {x_str}, {y_str}"
             )
+            raise MapParseError(line_num, msg_coords)
 
         zone_type_str = meta.get("zone", "normal")
         try:
             zone_type = ZoneType.from_str(zone_type_str)
         except ValueError:
-            raise MapParseError(
-                line_num, f"Tipo de zona inválido: '{zone_type_str}'"
-            )
+            msg_type = f"Tipo de zona inválido: '{zone_type_str}'"
+            raise MapParseError(line_num, msg_type)
 
         color = meta.get("color", None)
         max_drones = 1
@@ -128,23 +155,26 @@ class Parser:
                 if max_drones <= 0:
                     raise ValueError()
             except ValueError:
-                raise MapParseError(
-                    line_num, "max_drones deve ser um inteiro positivo"
+                msg_max = (
+                    "max_drones deve ser um inteiro positivo"
                 )
+                raise MapParseError(line_num, msg_max)
 
         return name, x, y, zone_type, color, max_drones
 
     def _parse_special_hub(self, line: str, line_num: int) -> None:
         is_start = line.startswith("start_hub:")
         if is_start and self.start_found:
-            raise MapParseError(line_num, "Apenas um start_hub é permitido")
+            msg_start = "Apenas um start_hub é permitido"
+            raise MapParseError(line_num, msg_start)
         if not is_start and self.end_found:
-            raise MapParseError(line_num, "Apenas um end_hub é permitido")
+            msg_end = "Apenas um end_hub é permitido"
+            raise MapParseError(line_num, msg_end)
 
-        name, x, y, z_type, color, max_drones = self._parse_zone_data(
+        name, x, y, z_type, color, _ = self._parse_zone_data(
             line, line_num
         )
-        zone = Zone(name, x, y, z_type, color, max_drones)
+        zone = Zone(name, x, y, z_type, color, max_drones=999999)
 
         self.graph.add_zone(zone)
         if is_start:
@@ -158,35 +188,45 @@ class Parser:
         name, x, y, z_type, color, max_drones = self._parse_zone_data(
             line, line_num
         )
-        self.graph.add_zone(Zone(name, x, y, z_type, color, max_drones))
+        self.graph.add_zone(
+            Zone(name, x, y, z_type, color, max_drones)
+        )
 
     def _parse_connection(self, line: str, line_num: int) -> None:
-        clean_line, meta = self._extract_metadata(line)
+        clean_line, meta = self._extract_metadata(
+            line, line_num, {"max_link_capacity"}
+        )
         conn_str = clean_line.split(":")[1].strip()
 
         if "-" not in conn_str:
-            raise MapParseError(
-                line_num, "Conexão deve ser no formato <zone1>-<zone2>"
+            msg_conn = (
+                "Conexão deve ser no formato <zone1>-<zone2>"
             )
+            raise MapParseError(line_num, msg_conn)
 
-        z1_name, z2_name = conn_str.split("-", 1)
+        names = conn_str.split("-")
+        if len(names) != 2 or not all(names):
+            raise MapParseError(
+                line_num, "Conexão deve conter exatamente duas zonas"
+            )
+        z1_name, z2_name = names
 
         if (
             z1_name not in self.graph.zones
             or z2_name not in self.graph.zones
         ):
-            raise MapParseError(
-                line_num,
-                f"Conexão refere-se a zona inexistente:"
-                f"'{z1_name}' ou '{z2_name}'",
+            msg_missing = (
+                "Conexão refere-se a zona inexistente: "
+                f"'{z1_name}' ou '{z2_name}'"
             )
+            raise MapParseError(line_num, msg_missing)
 
-        # Checa duplicatas (a-b ou b-a)
         pair = (min(z1_name, z2_name), max(z1_name, z2_name))
         if pair in self.connection_set:
-            raise MapParseError(
-                line_num, f"Conexão duplicada entre '{z1_name}' e '{z2_name}'"
+            msg_dup = (
+                f"Conexão duplicada entre '{z1_name}' e '{z2_name}'"
             )
+            raise MapParseError(line_num, msg_dup)
         self.connection_set.add(pair)
 
         max_capacity = 1
@@ -196,9 +236,10 @@ class Parser:
                 if max_capacity <= 0:
                     raise ValueError()
             except ValueError:
-                raise MapParseError(
-                    line_num, "max_link_capacity deve ser um inteiro positivo"
+                msg_cap = (
+                    "max_link_capacity deve ser um inteiro positivo"
                 )
+                raise MapParseError(line_num, msg_cap)
 
         conn = Connection(
             self.graph.zones[z1_name],
@@ -209,6 +250,32 @@ class Parser:
 
     def _validate_final_graph(self) -> None:
         if not self.start_found or self.graph.start_hub is None:
-            raise MapParseError(0, "O mapa não possui um start_hub definido")
+            msg_no_start = "O mapa não possui um start_hub definido"
+            raise MapParseError(0, msg_no_start)
         if not self.end_found or self.graph.end_hub is None:
-            raise MapParseError(0, "O mapa não possui um end_hub definido")
+            msg_no_end = "O mapa não possui um end_hub definido"
+            raise MapParseError(0, msg_no_end)
+
+        if not self._has_path_to_end():
+            raise MapParseError(
+                0, "Não existe caminho entre start_hub e end_hub"
+            )
+
+    def _has_path_to_end(self) -> bool:
+        """Verifica se existe um caminho transitável até o end_hub."""
+        if self.graph.start_hub is None or self.graph.end_hub is None:
+            return False
+
+        visited: Set[str] = {self.graph.start_hub.name}
+        pending = [self.graph.start_hub]
+        while pending:
+            current = pending.pop()
+            if current.name == self.graph.end_hub.name:
+                return True
+            for neighbor in self.graph.get_neighbors(current):
+                if neighbor.zone_type == ZoneType.BLOCKED:
+                    continue
+                if neighbor.name not in visited:
+                    visited.add(neighbor.name)
+                    pending.append(neighbor)
+        return False

@@ -1,9 +1,8 @@
+*This project has been created as part of the 42 curriculum by Yan Matos.*
+
 # Fly-In
 
-*This project was created as part of the 42 curriculum by Yan Matos.*
-
 ---
-
 ## Table of Contents
 
 1. [Description](#description)
@@ -19,7 +18,7 @@
    - [Standard Mode (Official Output)](#standard-mode-official-output)
    - [Visual Mode (-v)](#visual-mode--v)
    - [Debug Mode (-d)](#debug-mode--d)
-7. [Installation & How to Run](#installation--how-to-run)
+7. [Instructions: Installation & How to Run](#Instructions: installation--how-to-run)
 8. [Code Quality & Standards](#code-quality--standards)
 9. [Resources & AI Usage](#resources--ai-usage)
 
@@ -216,7 +215,7 @@ Total de rotas disjuntas encontradas: 1
 
 ---
 
-## Installation & How to Run
+## Instructions: Installation & How to Run
 
 ### Installation
 

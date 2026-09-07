@@ -1,3 +1,5 @@
+"""Ponto de entrada principal do simulador de tráfego de drones Fly-In."""
+
 import argparse
 import sys
 from typing import Dict, List
@@ -9,8 +11,7 @@ from src.visualizer import TerminalVisualizer
 
 
 def show_debug_info(graph: Graph, nb_drones: int) -> None:
-    """Exibe informações detalhadas
-    de diagnóstico (apenas com flag --debug)."""
+    """Exibe informações detalhadas de diagnóstico."""
     print("=== Mapa Carregado com Sucesso ===")
     print(f"Número de drones: {nb_drones}")
     print(f"Start Hub: {graph.start_hub}")
@@ -36,11 +37,10 @@ def show_debug_info(graph: Graph, nb_drones: int) -> None:
 def run_visual_mode(
     graph: Graph, simulator: Simulator, output_lines: List[str]
 ) -> None:
-    """Renderiza a simulação visual turno a turno com tabela de ocupação."""
+    """Renderiza a simulação visual turno a turno com ocupação."""
     visualizer = TerminalVisualizer(graph)
 
     for turn_idx, line in enumerate(output_lines):
-        # Mapeia onde cada drone está neste turno exato
         drone_positions: Dict[str, List[str]] = {
             z_name: [] for z_name in graph.zones.keys()
         }
@@ -49,11 +49,9 @@ def run_visual_mode(
             plan = simulator.drone_plans.get(drone.id, [])
             if turn_idx < len(plan):
                 current_loc = plan[turn_idx]
-                # Se estiver dentro de uma zona cadastrada no grafo
                 if current_loc in drone_positions:
                     drone_positions[current_loc].append(drone.name)
             else:
-                # Drones que já finalizaram continuam contabilizados no end_hub
                 if graph.end_hub:
                     drone_positions[graph.end_hub.name].append(drone.name)
 
@@ -61,6 +59,7 @@ def run_visual_mode(
 
 
 def main() -> None:
+    """Função de entrada da CLI."""
     cli_parser = argparse.ArgumentParser(
         description="Fly-in: Roteador e simulador de tráfego de drones."
     )
@@ -95,9 +94,10 @@ def main() -> None:
         if args.visual:
             run_visual_mode(graph, simulator, output_lines)
         else:
-            # Saída oficial padrão exigida pelo subject (VII.5)
             for line in output_lines:
-                print(line)
+                # Garante separação rigorosa de tokens individuais
+                tokens = [t.strip() for t in line.split() if t.strip()]
+                print(" ".join(tokens))
 
     except MapParseError as err:
         sys.stderr.write(f"Erro no mapa: {err}\n")

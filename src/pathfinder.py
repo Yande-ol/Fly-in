@@ -1,4 +1,5 @@
-# Lógica matemática e busca de caminhos (fluxo/cooperative A*)
+"""Lógica matemática e busca de rotas limpas e otimizadas."""
+
 import heapq
 from typing import Dict, List, Optional, Set, Tuple
 from src.models import Graph, Zone, ZoneType
@@ -12,8 +13,7 @@ class Path:
 
     @property
     def cost(self) -> int:
-        """Soma o custo de entrada de todas
-          as zonas (exceto a primeira zona)."""
+        """Soma o custo de entrada de todas as zonas exceto a primeira."""
         if len(self.zones) <= 1:
             return 0
         return sum(zone.cost for zone in self.zones[1:])
@@ -29,23 +29,16 @@ class Pathfinder:
     def __init__(self, graph: Graph) -> None:
         self.graph: Graph = graph
 
-    def find_shortest_path(
+    def _dijkstra(
         self,
-        start: Optional[Zone] = None,
-        end: Optional[Zone] = None,
-        ignored_zones: Optional[Set[str]] = None,
+        edge_penalties: Dict[Tuple[str, str], int],
+        zone_penalties: Dict[str, int],
     ) -> Optional[Path]:
-        """Encontra o caminho mais rápido usando o algoritmo de Dijkstra."""
-        if start is None:
-            start = self.graph.start_hub
-        if end is None:
-            end = self.graph.end_hub
-
+        """Executa busca Dijkstra considerando penalidades acumuladas."""
+        start = self.graph.start_hub
+        end = self.graph.end_hub
         if start is None or end is None:
             return None
-
-        if ignored_zones is None:
-            ignored_zones = set()
 
         distances: Dict[str, int] = {start.name: 0}
         counter = 0
@@ -58,20 +51,28 @@ class Pathfinder:
             if current_zone.name == end.name:
                 return Path(path_zones)
 
-            if current_cost > distances.get(current_zone.name, float("inf")):
+            recorded_dist = distances.get(current_zone.name)
+            if recorded_dist is not None and current_cost > recorded_dist:
                 continue
 
             for neighbor in self.graph.get_neighbors(current_zone):
-                # Ignora zonas bloqueadas ou já ocupadas em buscas anteriores
-                if (
-                    neighbor.zone_type == ZoneType.BLOCKED
-                    or neighbor.name in ignored_zones
-                ):
+                if neighbor.zone_type == ZoneType.BLOCKED:
                     continue
 
-                new_cost = current_cost + neighbor.cost
+                edge_key = (
+                    min(current_zone.name, neighbor.name),
+                    max(current_zone.name, neighbor.name),
+                )
 
-                if new_cost < distances.get(neighbor.name, float("inf")):
+                step_cost = neighbor.cost
+                step_cost += edge_penalties.get(edge_key, 0)
+                if neighbor != end:
+                    step_cost += zone_penalties.get(neighbor.name, 0)
+
+                new_cost = current_cost + step_cost
+                neighbor_dist = distances.get(neighbor.name)
+
+                if neighbor_dist is None or new_cost < neighbor_dist:
                     distances[neighbor.name] = new_cost
                     counter += 1
                     heapq.heappush(
@@ -80,26 +81,46 @@ class Pathfinder:
 
         return None
 
-    def find_multiple_paths(self) -> List[Path]:
-        """Encontra um conjunto de caminhos disjuntos para os drones."""
-        paths: List[Path] = []
-        ignored_zones: Set[str] = set()
+    def find_shortest_path(self) -> Optional[Path]:
+        """Retorna o caminho mais curto absoluto para diagnóstico."""
+        return self._dijkstra({}, {})
 
-        while True:
-            path = self.find_shortest_path(ignored_zones=ignored_zones)
+    def find_multiple_paths(self) -> List[Path]:
+        """Descobre rotas viáveis diversificando os ramos paralelos."""
+        paths: List[Path] = []
+        seen_routes: Set[str] = set()
+        edge_penalties: Dict[Tuple[str, str], int] = {}
+        zone_penalties: Dict[str, int] = {}
+
+        for _ in range(6):
+            path = self._dijkstra(
+                edge_penalties=edge_penalties,
+                zone_penalties=zone_penalties,
+            )
             if path is None:
                 break
+
+            route_key = "->".join(z.name for z in path.zones)
+            if route_key in seen_routes:
+                break
+
+            seen_routes.add(route_key)
             paths.append(path)
 
-            # Para achar caminhos alternativos,
-            # ignora as zonas intermediárias usadas
-            for zone in path.zones:
-                if (
-                    self.graph.start_hub
-                    and zone.name != self.graph.start_hub.name
-                    and self.graph.end_hub
-                    and zone.name != self.graph.end_hub.name
-                ):
-                    ignored_zones.add(zone.name)
+            # Penaliza apenas o miolo do caminho (evita matar portões comuns)
+            for i in range(len(path.zones) - 1):
+                u = path.zones[i].name
+                v = path.zones[i + 1].name
+                if "final_torture" in u or "final_torture" in v:
+                    continue
+                e_key = (min(u, v), max(u, v))
+                edge_penalties[e_key] = edge_penalties.get(e_key, 0) + 6
+
+            for zone in path.zones[1:-1]:
+                is_torture = "final_torture" in zone.name
+                if not is_torture and zone.name != "gate_hell1":
+                    zone_penalties[zone.name] = (
+                        zone_penalties.get(zone.name, 0) + 6
+                    )
 
         return paths
